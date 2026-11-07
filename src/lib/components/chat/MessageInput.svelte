@@ -995,6 +995,9 @@
 	// A temporary chat is never saved, so a per-chat workspace terminal has nothing to
 	// attach to; disable it automatically instead of failing the first message.
 	// Direct and default-context terminals keep working in temporary chats.
+	// The auto-disabled pick is remembered so toggling temporary mode back off
+	// restores the previous selection.
+	let autoDisabledTerminalId: string | null = null;
 	$: if (
 		terminalSelectionEnabled &&
 		inputId === 'chat-input' &&
@@ -1004,7 +1007,33 @@
 			(t) => t.id === $selectedTerminalId && t.contexts?.chat?.context_id === 'chat_id'
 		)
 	) {
+		autoDisabledTerminalId = $selectedTerminalId;
 		selectedTerminalId.set(null);
+	}
+
+	// Restore the remembered terminal once the chat is no longer temporary,
+	// unless something else got selected in the meantime.
+	$: if (
+		terminalSelectionEnabled &&
+		inputId === 'chat-input' &&
+		!chatIsTemporary &&
+		!$selectedTerminalId &&
+		autoDisabledTerminalId
+	) {
+		const restoredTerminalId = autoDisabledTerminalId;
+		autoDisabledTerminalId = null;
+		selectedTerminalId.set(restoredTerminalId);
+	}
+
+	// A manual pick supersedes the remembered terminal.
+	$: if (
+		terminalSelectionEnabled &&
+		inputId === 'chat-input' &&
+		!chatIsTemporary &&
+		$selectedTerminalId &&
+		$selectedTerminalId !== autoDisabledTerminalId
+	) {
+		autoDisabledTerminalId = null;
 	}
 
 	const scrollToBottom = () => {
