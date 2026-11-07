@@ -8,6 +8,7 @@
 		showSettings,
 		terminalServers,
 		selectedTerminalId,
+		temporaryChatEnabled,
 		user
 	} from '$lib/stores';
 	import { getToolServersData } from '$lib/apis';
@@ -25,11 +26,14 @@
 
 	const chatContext = (terminal: any) => terminal?.contexts?.chat ?? {};
 
+	// A temporary chat is never saved, so per-chat terminals have nothing to attach to —
+	// drop them from the picker even before the first message minted the temporary id.
+	$: chatIsTemporary = $temporaryChatEnabled || isTemporaryChatId($activeChatId);
 	$: systemTerminals = ($terminalServers ?? []).filter(
 		(t) =>
 			t.id &&
 			chatContext(t) !== false &&
-			!(isTemporaryChatId($activeChatId) && chatContext(t)?.context_id === 'chat_id')
+			!(chatIsTemporary && chatContext(t)?.context_id === 'chat_id')
 	);
 	$: directTerminals = (
 		$config?.features?.enable_direct_integrations ? ($settings?.terminalServers ?? []) : []

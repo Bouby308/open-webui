@@ -73,7 +73,7 @@
 	} from '$lib/utils';
 	import { uploadFile } from '$lib/apis/files';
 	import { getCwd, uploadNewFileToTerminal } from '$lib/apis/terminal';
-	import { isSavedChatId } from '$lib/utils/chatId';
+	import { isSavedChatId, isTemporaryChatId } from '$lib/utils/chatId';
 	import { generateAutoCompletion } from '$lib/apis';
 	import { deleteFileById } from '$lib/apis/files';
 	import { getChatById } from '$lib/apis/chats';
@@ -166,6 +166,8 @@
 	export let temporary: boolean | undefined = undefined;
 	export let onTemporaryChange: ((value: boolean) => void) | null = null;
 	$: isTemporary = temporary ?? $temporaryChatEnabled;
+	// A temporary chat is never saved, so per-chat workspace terminals have no chat context.
+	$: chatIsTemporary = isTemporary || isTemporaryChatId(chatId);
 	export let terminalContext: TerminalContext | null = null;
 	export let terminalSelectionEnabled = true;
 	export let contextUsage = null;
@@ -919,7 +921,9 @@
 	$: showTerminalSelector =
 		terminalSelectionEnabled &&
 		$config?.features?.enable_tool_servers &&
-		(($terminalServers ?? []).some((t) => t.id) ||
+		(($terminalServers ?? []).some(
+			(t) => t.id && !(chatIsTemporary && t.contexts?.chat?.context_id === 'chat_id')
+		) ||
 			(hasDirectToolServerAccess &&
 				(($terminalServers ?? []).some((t) => !t.id) ||
 					($settings?.terminalServers ?? []).some((s) => s.url))));
@@ -986,6 +990,21 @@
 	// Disable code interpreter when terminal is active (mutually exclusive)
 	$: if ($selectedTerminalId && codeInterpreterEnabled) {
 		codeInterpreterEnabled = false;
+	}
+
+	// A temporary chat is never saved, so a per-chat workspace terminal has nothing to
+	// attach to; disable it automatically instead of failing the first message.
+	// Direct and default-context terminals keep working in temporary chats.
+	$: if (
+		terminalSelectionEnabled &&
+		inputId === 'chat-input' &&
+		chatIsTemporary &&
+		$selectedTerminalId &&
+		($terminalServers ?? []).some(
+			(t) => t.id === $selectedTerminalId && t.contexts?.chat?.context_id === 'chat_id'
+		)
+	) {
+		selectedTerminalId.set(null);
 	}
 
 	const scrollToBottom = () => {

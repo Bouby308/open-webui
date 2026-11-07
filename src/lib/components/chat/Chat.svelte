@@ -1149,6 +1149,13 @@
 				currentModels.every((model) => model.info?.meta?.defaultFeatureIds?.includes(feature));
 			const folderTerminalId = !history.currentId ? $selectedFolder?.data?.terminal_id : null;
 			const terminalId = folderTerminalId || currentModels[0]?.info?.meta?.terminalId;
+			// A temporary chat is never saved, so a per-chat workspace terminal has
+			// nothing to attach to; direct and default-context terminals are fine.
+			const perChatDefaultBlocked =
+				($temporaryChatEnabled || isTemporaryChatId(id)) &&
+				($terminalServers ?? []).some(
+					(t) => t.id === terminalId && t.contexts?.chat?.context_id === 'chat_id'
+				);
 			const defaults: Record<string, any> = {
 				selectedToolIds: [
 					...new Set(
@@ -1178,6 +1185,7 @@
 				codeInterpreterEnabled: !!defaultFeature('code_interpreter'),
 				terminalId:
 					terminalId &&
+					!perChatDefaultBlocked &&
 					isTerminalAvailable(terminalId) &&
 					(folderTerminalId ||
 						currentModels.every((model) => model.info?.meta?.terminalId === terminalId))
